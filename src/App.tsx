@@ -50,12 +50,12 @@ function App() {
         if (newNotes.length === 0) {
           newNotes = shuffle(shuffle(FRETBOARD_NOTES[activeStringIdx]));
         }
-        setStrings(getStrings(activeStringIdx, notes[0]));
-        setNotes(newNotes);
+        setStrings(() => getStrings(activeStringIdx, notes[0]));
+        setNotes(() => newNotes);
         skipClick = true;
       }
 
-      setCurrentBeat(beat);
+      setCurrentBeat((prevBeat) => prevBeat + 1);
 
       if (!skipClick) {
         synth.triggerAttackRelease('1', "16n", Tone.now());
