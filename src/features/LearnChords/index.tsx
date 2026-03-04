@@ -33,9 +33,13 @@ const CAGED_SHAPES: ShapeName[] = ['E', 'A', 'G', 'C', 'D']
 function voicingToFretDots(voicing: ChordVoicing, root: string, symbol: string): FretDot[] {
   const chord = Chord.get(root + symbol)
   const chromaToInterval = new Map<number, string>()
+  const chromaToNote = new Map<number, string>()
   chord.notes.forEach((n, i) => {
     const chroma = Note.chroma(n)
-    if (chroma !== undefined) chromaToInterval.set(chroma, chord.intervals[i])
+    if (chroma !== undefined) {
+      chromaToInterval.set(chroma, chord.intervals[i])
+      chromaToNote.set(chroma, Note.get(n).pc ?? n)
+    }
   })
 
   return voicing.strings
@@ -49,6 +53,7 @@ function voicingToFretDots(voicing: ChordVoicing, root: string, symbol: string):
       return {
         string: fbString,
         fret,
+        note: chromaToNote.get(chroma)!,
         interval: intervalLabel(chromaToInterval.get(chroma)!),
       }
     })
@@ -88,6 +93,7 @@ export default function LearnChords() {
 
   // ── Drill mode ───────────────────────────────────────────────────────────
   const [drillMode, setDrillMode] = useState(false)
+  const [drillStarted, setDrillStarted] = useState(false)
   const [drillRoot, setDrillRoot] = useState('A')
   const [drillEnabledSymbols, setDrillEnabledSymbols] = useState<string[]>(['M', 'm'])
   const [drillItemIdx, setDrillItemIdx] = useState(0)
@@ -174,8 +180,8 @@ export default function LearnChords() {
     fretFrom: number
     fretTo: number
   } => {
-    // Drill playing: show current voicing
-    if (drillMode && isPlaying && currentDrillItem?.voicing) {
+    // Drill active (playing or paused): show current voicing
+    if (drillMode && drillStarted && currentDrillItem?.voicing) {
       return {
         dots: voicingToFretDots(
           currentDrillItem.voicing,
@@ -204,7 +210,7 @@ export default function LearnChords() {
       fretTo: refVoicings[clampedVoicingIdx].fretTo,
     }
   }, [
-    drillMode, isPlaying, currentDrillItem, drillRoot,
+    drillMode, drillStarted, currentDrillItem, drillRoot,
     displayMode, root, quality, refVoicings, clampedVoicingIdx,
   ])
 
@@ -226,29 +232,53 @@ export default function LearnChords() {
               Drill ▶
             </button>
           )}
-          {drillMode && !isPlaying && (
+          {drillMode && !drillStarted && (
             <>
-              <button
-                onClick={() => setIsPlaying(true)}
-                className="px-4 py-1.5 rounded text-sm font-medium bg-green-700 text-white hover:bg-green-600 transition"
-              >
-                Start ▶
-              </button>
               <button
                 onClick={() => setDrillMode(false)}
                 className="px-4 py-1.5 rounded text-sm font-medium bg-zinc-700 text-zinc-300 hover:bg-zinc-600 transition"
               >
                 Cancel
               </button>
+              <button
+                onClick={() => { setIsPlaying(true); setDrillStarted(true) }}
+                className="px-4 py-1.5 rounded text-sm font-medium bg-green-700 text-white hover:bg-green-600 transition"
+              >
+                Start ▶
+              </button>
             </>
           )}
-          {drillMode && isPlaying && (
-            <button
-              onClick={() => { setIsPlaying(false); setDrillMode(false) }}
-              className="px-4 py-1.5 rounded text-sm font-medium bg-red-800 text-white hover:bg-red-700 transition"
-            >
-              End Drill
-            </button>
+          {drillMode && drillStarted && !isPlaying && (
+            <>
+              <button
+                onClick={() => { setDrillMode(false); setDrillStarted(false) }}
+                className="px-4 py-1.5 rounded text-sm font-medium bg-red-800 text-white hover:bg-red-700 transition"
+              >
+                End Drill
+              </button>
+              <button
+                onClick={() => setIsPlaying(true)}
+                className="px-4 py-1.5 rounded text-sm font-medium bg-green-700 text-white hover:bg-green-600 transition"
+              >
+                Resume ▶
+              </button>
+            </>
+          )}
+          {drillMode && drillStarted && isPlaying && (
+            <>
+              <button
+                onClick={() => { setIsPlaying(false); setDrillMode(false); setDrillStarted(false) }}
+                className="px-4 py-1.5 rounded text-sm font-medium bg-red-800 text-white hover:bg-red-700 transition"
+              >
+                End Drill
+              </button>
+              <button
+                onClick={() => setIsPlaying(false)}
+                className="px-4 py-1.5 rounded text-sm font-medium bg-zinc-700 text-zinc-300 hover:bg-zinc-600 transition"
+              >
+                Pause ⏸
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -292,7 +322,7 @@ export default function LearnChords() {
       )}
 
       {/* ── Drill config (before starting) ── */}
-      {drillMode && !isPlaying && (
+      {drillMode && !drillStarted && (
         <div className="flex flex-col gap-5 w-full max-w-3xl">
           <div>
             <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5">Root Note</div>
@@ -345,7 +375,7 @@ export default function LearnChords() {
       )}
 
       {/* ── Drill playing: current chord ── */}
-      {drillMode && isPlaying && currentDrillItem && (
+      {drillMode && drillStarted && currentDrillItem && (
         <div className="flex flex-col items-center gap-1.5">
           <div className="text-5xl font-bold font-mono text-center">
             <span className="text-amber-400">{drillRoot}</span>{' '}
@@ -398,9 +428,9 @@ export default function LearnChords() {
       )}
 
       {/* ── Fretboard (hidden during drill config) ── */}
-      {(!drillMode || isPlaying) && (
+      {(!drillMode || drillStarted) && (
         <div className="w-full max-w-3xl overflow-x-auto">
-          <FretboardView dots={dots} fretFrom={fretFrom} fretTo={fretTo} dotText={dotText} />
+          <FretboardView dots={dots} fretFrom={fretFrom} fretTo={fretTo} dotText={dotText} colorBy="interval" />
         </div>
       )}
 

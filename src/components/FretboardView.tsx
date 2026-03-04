@@ -19,6 +19,7 @@ interface FretboardViewProps {
   fretFrom?: number
   fretTo?: number
   dotText?: (dot: FretDot) => string
+  colorBy?: 'note' | 'interval'  // default: 'note' when note present, else 'interval'
 }
 
 const SINGLE_MARKER_FRETS = [3, 5, 7, 9, 15, 17, 19, 21]
@@ -60,7 +61,7 @@ function addFretMarkers(fb: Fretboard, fretFrom: number, fretTo: number) {
   }
 }
 
-export default function FretboardView({ dots, fretFrom = 0, fretTo = 12, dotText }: FretboardViewProps) {
+export default function FretboardView({ dots, fretFrom = 0, fretTo = 12, dotText, colorBy }: FretboardViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const fretboardRef = useRef<Fretboard | null>(null)
 
@@ -94,7 +95,7 @@ export default function FretboardView({ dots, fretFrom = 0, fretTo = 12, dotText
     const positions = dots.map(d => {
       const pos: Record<string, string | number | boolean> = {
         string: d.string,
-        fret: d.fret,
+        fret: d.fret - fretFrom,
       }
       if (d.note !== undefined) pos.note = d.note
       if (d.interval !== undefined) pos.interval = d.interval
@@ -114,12 +115,13 @@ export default function FretboardView({ dots, fretFrom = 0, fretTo = 12, dotText
 
     const hasNote     = dots.some(d => d.note     !== undefined)
     const hasInterval = dots.some(d => d.interval !== undefined)
+    const useIntervalColors = colorBy === 'interval' || !hasNote
 
     // Clear default fretboard.js dot stroke on all dots
     fb.style({ stroke: 'none' })
 
-    if (hasNote) {
-      // Layer 1: chromatic fill + matched text color, one call per pitch class
+    if (!useIntervalColors) {
+      // Chromatic fill: one style call per pitch class
       for (const [noteName, def] of Object.entries(NOTE_COLOR_DEFS)) {
         const fill = toHsl(def)
         if (dotText) {
@@ -133,8 +135,8 @@ export default function FretboardView({ dots, fretFrom = 0, fretTo = 12, dotText
           fb.style({ filter: (d: { note?: string }) => d.note === noteName, fill })
         }
       }
-    } else if (hasInterval && !hasNote) {
-      // Interval-function fill only (no chromatic note data on these dots)
+    } else if (hasInterval) {
+      // Interval-function fill: root/third/fifth get distinct colors
       for (const [fn, def] of Object.entries(INTERVAL_FUNCTION_DEFS) as [string, typeof INTERVAL_FUNCTION_DEFS[keyof typeof INTERVAL_FUNCTION_DEFS]][]) {
         const fnKey = fn as 'root' | 'third' | 'fifth'
         const fill = toHsl(def)
@@ -145,7 +147,7 @@ export default function FretboardView({ dots, fretFrom = 0, fretTo = 12, dotText
         if (dotText) { styleOpts.text = dotText; styleOpts.fontFill = def.textColor }
         fb.style(styleOpts)
       }
-      // Dots that don't map to root/third/fifth: apply dotText with default color
+      // Other intervals: apply dotText with default color
       if (dotText) {
         fb.style({
           filter: (d: { interval?: string }) => intervalToFunction(d.interval ?? '') === null,
