@@ -1,5 +1,70 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Color system — designed for dark background (~#0f0e0c)
+   Each note stores hue / saturation / lightness as separate custom properties
+   so they can be composed and overridden without repetition.
+
+   Two layers:
+     1. Chromatic (12-tone, C-anchored) — --note-{name}-{h|s|l}
+     2. Interval function (Root / Third / Fifth) — --interval-{fn}-{h|s|l}
+
+   C intentionally shares Root; G intentionally shares Fifth.
+   Text contrast is hardcoded (HSL lightness alone is perceptually unreliable).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Chromatic note custom properties ─────────────────────────────────── */
+  --note-c-h:  11;  --note-c-s:  100%;  --note-c-l:  59%;
+  --note-cs-h: 22;  --note-cs-s: 100%;  --note-cs-l: 55%;
+  --note-d-h:  35;  --note-d-s:  100%;  --note-d-l:  50%;
+  --note-ds-h: 50;  --note-ds-s: 100%;  --note-ds-l: 57%;
+  --note-e-h:  76;  --note-e-s:  79%;   --note-e-l:  56%;
+  --note-f-h:  136; --note-f-s:  55%;   --note-f-l:  55%;
+  --note-fs-h: 170; --note-fs-s: 75%;   --note-fs-l: 42%;
+  --note-g-h:  180; --note-g-s:  60%;   --note-g-l:  53%;
+  --note-gs-h: 203; --note-gs-s: 78%;   --note-gs-l: 54%;
+  --note-a-h:  224; --note-a-s:  100%;  --note-a-l:  65%;
+  --note-as-h: 258; --note-as-s: 89%;   --note-as-l: 66%;
+  --note-b-h:  325; --note-b-s:  60%;   --note-b-l:  52%;
+
+  /* ── Interval function custom properties ──────────────────────────────── */
+  --interval-root-h:  11;  --interval-root-s:  100%; --interval-root-l:  59%;
+  --interval-third-h: 50;  --interval-third-s: 100%; --interval-third-l: 57%;
+  --interval-fifth-h: 180; --interval-fifth-s: 60%;  --interval-fifth-l: 53%;
+}
+
+/* ── Chromatic note utility classes ──────────────────────────────────────── */
+/* bg = note fill; color = hardcoded text contrast (perceptually verified)   */
+
+.note-c  { background-color: hsl(var(--note-c-h),  var(--note-c-s),  var(--note-c-l));  color: white;    }
+.note-cs { background-color: hsl(var(--note-cs-h), var(--note-cs-s), var(--note-cs-l)); color: white;    }
+.note-d  { background-color: hsl(var(--note-d-h),  var(--note-d-s),  var(--note-d-l));  color: #1a0800;  }
+.note-ds { background-color: hsl(var(--note-ds-h), var(--note-ds-s), var(--note-ds-l)); color: #1a1000;  }
+.note-e  { background-color: hsl(var(--note-e-h),  var(--note-e-s),  var(--note-e-l));  color: #151c00;  }
+.note-f  { background-color: hsl(var(--note-f-h),  var(--note-f-s),  var(--note-f-l));  color: #001a0a;  }
+.note-fs { background-color: hsl(var(--note-fs-h), var(--note-fs-s), var(--note-fs-l)); color: #001a15;  }
+.note-g  { background-color: hsl(var(--note-g-h),  var(--note-g-s),  var(--note-g-l));  color: #001a1a;  }
+.note-gs { background-color: hsl(var(--note-gs-h), var(--note-gs-s), var(--note-gs-l)); color: #001424;  }
+.note-a  { background-color: hsl(var(--note-a-h),  var(--note-a-s),  var(--note-a-l));  color: white;    }
+.note-as { background-color: hsl(var(--note-as-h), var(--note-as-s), var(--note-as-l)); color: white;    }
+.note-b  { background-color: hsl(var(--note-b-h),  var(--note-b-s),  var(--note-b-l));  color: white;    }
+
+/* ── Interval function utility classes ───────────────────────────────────── */
+
+.interval-root  { background-color: hsl(var(--interval-root-h),  var(--interval-root-s),  var(--interval-root-l));  color: white;    }
+.interval-third { background-color: hsl(var(--interval-third-h), var(--interval-third-s), var(--interval-third-l)); color: #1a1000;  }
+.interval-fifth { background-color: hsl(var(--interval-fifth-h), var(--interval-fifth-s), var(--interval-fifth-l)); color: #001a1a;  }
+
+/*
+  When both systems apply to the same HTML element (chromatic id + interval role),
+  keep chromatic bg and add an interval-function box-shadow ring.
+  Compose as: <div class="note-a interval-root">
+*/
+[class*="note-"].interval-root  { box-shadow: 0 0 0 3px hsl(var(--interval-root-h),  var(--interval-root-s),  var(--interval-root-l));  }
+[class*="note-"].interval-third { box-shadow: 0 0 0 3px hsl(var(--interval-third-h), var(--interval-third-s), var(--interval-third-l)); }
+[class*="note-"].interval-fifth { box-shadow: 0 0 0 3px hsl(var(--interval-fifth-h), var(--interval-fifth-s), var(--interval-fifth-l)); }
+
 * {
   box-sizing: border-box;
 }
