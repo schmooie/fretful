@@ -7,11 +7,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'metronome', icon: '🥁', label: 'Metronome' },
-  { id: 'learn-notes', icon: '🎵', label: 'Notes' },
-  { id: 'learn-chords', icon: '🎸', label: 'Chords' },
-  { id: 'learn-triads', icon: '🔺', label: 'Triads' },
-  { id: 'learn-scales', icon: '🎼', label: 'Scales' },
+  { id: 'learn-notes',  icon: '🎵', label: 'Notes'      },
+  { id: 'learn-chords', icon: '🎸', label: 'Chords'     },
+  { id: 'learn-triads', icon: '🔺', label: 'Triads'     },
+  { id: 'learn-scales', icon: '🎼', label: 'Scales'     },
+  { id: 'metronome',    icon: '🥁', label: 'Metronome'  },
 ]
 
 interface SidebarProps {
