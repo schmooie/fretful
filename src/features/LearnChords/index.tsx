@@ -95,7 +95,7 @@ export default function LearnChords() {
   const [drillMode, setDrillMode] = useState(false)
   const [drillStarted, setDrillStarted] = useState(false)
   const [drillRoot, setDrillRoot] = useState('A')
-  const [drillEnabledSymbols, setDrillEnabledSymbols] = useState<string[]>(['M', 'm'])
+  const [drillEnabledSymbols, setDrillEnabledSymbols] = useState<string[]>(['M'])
   const [drillItemIdx, setDrillItemIdx] = useState(0)
 
   const [revealedItemIdx, setRevealedItemIdx] = useState(-1)
@@ -214,8 +214,8 @@ export default function LearnChords() {
           drillRoot,
           revealedDrillItem.qualitySymbol,
         ),
-        fretFrom: revealedDrillItem.voicing.fretFrom,
-        fretTo: revealedDrillItem.voicing.fretTo,
+        fretFrom: 0,
+        fretTo: 12,
       }
     }
 
@@ -229,11 +229,11 @@ export default function LearnChords() {
     }
 
     // Reference voicings view
-    if (!refVoicings.length) return { dots: [], fretFrom: 0, fretTo: 5 }
+    if (!refVoicings.length) return { dots: [], fretFrom: 0, fretTo: 12 }
     return {
       dots: voicingToFretDots(refVoicings[clampedVoicingIdx], root, quality),
-      fretFrom: refVoicings[clampedVoicingIdx].fretFrom,
-      fretTo: refVoicings[clampedVoicingIdx].fretTo,
+      fretFrom: 0,
+      fretTo: 12,
     }
   }, [
     drillMode, drillStarted, revealedDrillItem, drillRoot,
