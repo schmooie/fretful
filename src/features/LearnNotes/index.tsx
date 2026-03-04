@@ -9,20 +9,27 @@ const STRING_LABELS = ['E (low)', 'A', 'D', 'G', 'B', 'e (high)']
 export default function LearnNotes() {
   const { isPlaying, beatCallbackRef } = useMetronome()
 
+  // Multi-select: which strings are included in the drill
+  const [selectedStrings, setSelectedStrings] = useState<number[]>([0])
+
   const [activeStringIdx, setActiveStringIdx] = useState(0)
   const [noteQueue, setNoteQueue] = useState<string[]>(() => getChromatic(0))
   const [currentNote, setCurrentNote] = useState<string>(() => getChromatic(0)[0])
   const [revealedNote, setRevealedNote] = useState<string | null>(null)
   const [revealedStringIdx, setRevealedStringIdx] = useState(0)
+  const [countingIn, setCountingIn] = useState(false)
 
   const synthRef = useRef<Tone.Synth | null>(null)
   const noteQueueRef = useRef(noteQueue)
   const currentNoteRef = useRef(currentNote)
   const activeStringIdxRef = useRef(activeStringIdx)
+  const selectedStringsRef = useRef(selectedStrings)
+  const countInRef = useRef(false)
 
   useEffect(() => { noteQueueRef.current = noteQueue }, [noteQueue])
   useEffect(() => { currentNoteRef.current = currentNote }, [currentNote])
   useEffect(() => { activeStringIdxRef.current = activeStringIdx }, [activeStringIdx])
+  useEffect(() => { selectedStringsRef.current = selectedStrings }, [selectedStrings])
 
   useEffect(() => {
     synthRef.current = new Tone.Synth({
@@ -35,17 +42,27 @@ export default function LearnNotes() {
   const onBeat = useCallback((beat: number, time: number) => {
     if (beat !== 0) return
 
+    // Count-in: skip the first measure, then begin the drill
+    if (countInRef.current) {
+      countInRef.current = false
+      Tone.getDraw().schedule(() => setCountingIn(false), time)
+      return
+    }
+
     // Capture current challenge to reveal its dot
     const noteToReveal = currentNoteRef.current
     const stringToReveal = activeStringIdxRef.current
 
     // Advance queue to next challenge
     const queue = noteQueueRef.current.slice()
-    queue.shift()  // remove current note
+    queue.shift()
 
     let newQueue = queue
     if (newQueue.length === 0) {
-      const nextIdx = (activeStringIdxRef.current + 1) % 6
+      // Move to next selected string (circular)
+      const sel = selectedStringsRef.current
+      const pos = sel.indexOf(activeStringIdxRef.current)
+      const nextIdx = sel[(pos + 1) % sel.length]
       activeStringIdxRef.current = nextIdx
       newQueue = getChromatic(nextIdx)
     }
@@ -60,10 +77,8 @@ export default function LearnNotes() {
     }
 
     Tone.getDraw().schedule(() => {
-      // Reveal answer for current challenge
       setRevealedNote(noteToReveal)
       setRevealedStringIdx(stringToReveal)
-      // Advance to next challenge
       if (newQueue.length < noteQueueRef.current.length) {
         setActiveStringIdx(activeStringIdxRef.current)
       }
@@ -71,6 +86,16 @@ export default function LearnNotes() {
       setNoteQueue(newQueue)
     }, time)
   }, [])
+
+  // Arm count-in whenever the metronome starts
+  useEffect(() => {
+    if (isPlaying) {
+      countInRef.current = true
+      setCountingIn(true)
+    } else {
+      setCountingIn(false)
+    }
+  }, [isPlaying])
 
   // Register / unregister beat callback through context (single engine in MetronomePanel)
   useEffect(() => {
@@ -84,44 +109,63 @@ export default function LearnNotes() {
     return [{ string: 6 - revealedStringIdx, fret, note: revealedNote }]
   })() : []
 
-  const switchString = (idx: number) => {
-    setActiveStringIdx(idx)
-    const newQueue = getChromatic(idx)
-    setNoteQueue(newQueue)
-    setCurrentNote(newQueue[0])
-    setRevealedNote(null)
+  const toggleString = (idx: number) => {
+    setSelectedStrings(prev => {
+      if (prev.includes(idx)) {
+        if (prev.length === 1) return prev  // keep at least one selected
+        const next = prev.filter(s => s !== idx)
+        // If we're removing the active string, jump to the first remaining
+        if (activeStringIdx === idx) {
+          const newActive = next[0]
+          setActiveStringIdx(newActive)
+          activeStringIdxRef.current = newActive
+          const newQueue = getChromatic(newActive)
+          setNoteQueue(newQueue)
+          setCurrentNote(newQueue[0])
+          setRevealedNote(null)
+        }
+        return next
+      }
+      return [...prev, idx].sort((a, b) => a - b)
+    })
   }
 
   // noteNumber = how many notes into the string we are (1-indexed).
-  const noteNumber = revealedNote !== null ? 12 - noteQueue.length + 1 : 0
+  const noteNumber = revealedNote !== null ? 12 - noteQueue.length : 0
 
   return (
     <div className="flex flex-col items-center p-6 gap-6">
       <h1 className="text-4xl font-bold font-display tracking-tight text-fg-primary">Learn Notes</h1>
 
       <div className="flex flex-col items-center gap-1">
-        <div className="text-8xl font-bold text-ui-info font-display min-w-32 text-center">
+        <div className="text-8xl font-bold font-display min-w-32 text-center text-ui-info">
           {currentNote}
         </div>
         <div className="text-fg-secondary text-sm">
-          {isPlaying ? `on string: ${STRING_LABELS[activeStringIdx]}` : 'Press play to start'}
+          {isPlaying && !countingIn ? `on string: ${STRING_LABELS[activeStringIdx]}` : isPlaying ? '\u00a0' : 'Press play to start'}
         </div>
       </div>
 
       <div className="flex gap-2 flex-wrap justify-center">
-        {STRING_LABELS.map((label, idx) => (
-          <button
-            key={idx}
-            onClick={() => switchString(idx)}
-            className={`px-3 py-1.5 rounded text-sm font-mono transition ${
-              activeStringIdx === idx
-                ? 'bg-ui-primary text-white'
-                : 'bg-surface-2 text-fg-secondary hover:bg-surface-3'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {STRING_LABELS.map((label, idx) => {
+          const isActive = activeStringIdx === idx
+          const isSelected = selectedStrings.includes(idx)
+          return (
+            <button
+              key={idx}
+              onClick={() => toggleString(idx)}
+              className={`px-3 py-1.5 rounded text-sm font-mono transition ${
+                isActive
+                  ? 'bg-ui-primary text-white ring-2 ring-ui-primary ring-offset-2 ring-offset-base'
+                  : isSelected
+                    ? 'bg-ui-primary/30 text-fg-primary'
+                    : 'bg-surface-2 text-fg-muted hover:bg-surface-3'
+              }`}
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
 
       <div className="text-fg-muted text-xs">

@@ -26,8 +26,9 @@ Ear-training drill for memorising every note on every string.
 
 - One note name is shown per measure — find it on the fretboard before beat 1
 - On beat 1, the answer dot appears on the fretboard and the note plays
-- Cycles through all 12 chromatic pitches on the active string in random order, then moves to the next string
-- String selector lets you jump to any string at any time
+- **Count-in** — one silent measure plays before the first note is shown, giving you time to sync up
+- **Multi-string selection** — toggle any combination of the 6 strings to include in the drill; at least one must remain active
+- Cycles through all 12 chromatic pitches on each string in random order, then moves to the next selected string
 - Progress counter shows how many notes have been covered on the current string
 
 ---
@@ -40,13 +41,13 @@ Reference and drill tool for CAGED system chord voicings.
 
 - Choose any root (all 12 chromatic roots) and quality (Major, Minor, Dom 7, Maj 7, Min 7, Dim, Aug, Sus2, Sus4, m7♭5)
 - **Full Neck view** — shows all chord tones across the entire fretboard (frets 0–12) with interval or note-name labels
-- **Voicings view** — shows individual closed CAGED voicings (E, A, G, C, D shapes) one at a time; navigate with ← → arrows; fretboard fixed at frets 0–12
+- **Voicings view** — shows individual closed CAGED voicings sorted closest to nut first; navigate with ← → arrows; shape name (e.g. "C shape") shown alongside position counter; fretboard fixed at frets 0–12
 
 #### Drill mode
 
 - Select a root note and which chord qualities to include
 - The metronome reveals one chord per measure: the chord name and CAGED shape are shown on beat 1, the previous chord's voicing dots appear simultaneously
-- Cycles through all shapes for every selected quality
+- First pass plays all shapes in order; each subsequent pass is reshuffled so every chord repeats before shuffling again
 - Default: Major only; any combination of Major / Minor / Dom 7 / Maj 7 / Min 7
 - **Settings button** — returns to drill configuration mid-drill without losing settings
 
@@ -91,5 +92,6 @@ Configure and run a beat-synced triad drill:
 
 - Hash-based routing (`/#/learn-notes`, `/#/learn-chords`, etc.) — works on static hosts including GitHub Pages
 - Single metronome engine via React context; feature views subscribe via a beat callback ref
+- Navigating between screens stops the metronome automatically
 - Triad voicing algorithm tries two starting octaves per string to find all inversions; rejects spans > 4 frets; deduplicates to one voicing per (string set, inversion) pair
 - FRETBOARD_NOTES covers frets 0–15 so high-position voicings (fret 12+) render correctly

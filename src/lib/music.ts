@@ -15,7 +15,7 @@ export function getFretForNote(stringIdx: number, note: string): number {
 }
 
 export function getChromatic(stringIdx: number): string[] {
-  return shuffle(FRETBOARD_NOTES[stringIdx].map(n => n.replace(/\d/g, '')))
+  return shuffle(FRETBOARD_NOTES[stringIdx].slice(0, 12).map(n => n.replace(/\d/g, '')))
 }
 
 export function stripOctave(note: string): string {
