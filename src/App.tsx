@@ -1,4 +1,4 @@
-import { MetronomeProvider } from './contexts/MetronomeContext'
+import { MetronomeProvider, useMetronome } from './contexts/MetronomeContext'
 import Layout from './components/Layout'
 import MetronomeView from './features/Metronome'
 import LearnNotes from './features/LearnNotes'
@@ -6,9 +6,16 @@ import LearnChords from './features/LearnChords'
 import LearnTriads from './features/LearnTriads'
 import LearnScales from './features/LearnScales'
 import { useHashView } from './hooks/useHashView'
+import { View } from './components/Sidebar'
 
 function AppContent() {
   const [view, navigate] = useHashView()
+  const { isPlaying, setIsPlaying } = useMetronome()
+
+  const handleNavigate = (v: View) => {
+    if (isPlaying) setIsPlaying(false)
+    navigate(v)
+  }
 
   const renderView = () => {
     switch (view) {
@@ -21,7 +28,7 @@ function AppContent() {
   }
 
   return (
-    <Layout activeView={view} onNavigate={navigate}>
+    <Layout activeView={view} onNavigate={handleNavigate}>
       {renderView()}
     </Layout>
   )

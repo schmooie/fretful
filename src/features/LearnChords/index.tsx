@@ -11,6 +11,7 @@ import {
   getChordVoicings,
   getCagedVoicing,
   intervalLabel,
+  shuffle,
   ChordVoicing,
   ShapeName,
 } from '../../lib/music'
@@ -99,10 +100,13 @@ export default function LearnChords() {
   const [drillItemIdx, setDrillItemIdx] = useState(0)
 
   const [revealedItemIdx, setRevealedItemIdx] = useState(-1)
+  // sequence = active ordered/shuffled list used for display and beat callback
+  const [sequence, setSequence] = useState<DrillItem[]>([])
 
   const drillItemIdxRef = useRef(0)
   const revealedItemIdxRef = useRef(-1)
-  const drillItemsRef = useRef<DrillItem[]>([])
+  const sequenceRef = useRef<DrillItem[]>([])
+  const passRef = useRef(0)   // 0 = first pass (ordered), 1+ = shuffled
   const synthRef = useRef<Tone.Synth | null>(null)
 
   useEffect(() => { drillItemIdxRef.current = drillItemIdx }, [drillItemIdx])
@@ -121,11 +125,11 @@ export default function LearnChords() {
     [drillMode, drillRoot, drillEnabledSymbols],
   )
 
-  // Keep ref in sync for beat callback; initialise when items change.
-  // Start at -1 so the first beat introduces challenge 0 (no dots yet),
-  // and the second beat reveals challenge 0's dots + introduces challenge 1.
+  // When drill items change (new settings), reset to the ordered first pass.
   useEffect(() => {
-    drillItemsRef.current = drillItems
+    sequenceRef.current = drillItems
+    setSequence(drillItems)
+    passRef.current = 0
     if (drillItems.length > 0) {
       setDrillItemIdx(-1)
       drillItemIdxRef.current = -1
@@ -142,12 +146,21 @@ export default function LearnChords() {
   //   beat N → reveal=N-2, challenge=N-1
   const onBeat = useCallback((beat: number, time: number) => {
     if (beat !== 0) return
-    const items = drillItemsRef.current
+    const items = sequenceRef.current
     if (!items.length) return
 
     const toReveal = drillItemIdxRef.current                          // -1 on first beat
     revealedItemIdxRef.current = toReveal
     const nextIdx = toReveal < 0 ? 0 : (toReveal + 1) % items.length // 0 on first beat
+
+    // Detect wrap-around: completed a full pass, start a new shuffled pass
+    if (toReveal >= 0 && nextIdx === 0) {
+      passRef.current += 1
+      const newSeq = shuffle(items.slice())
+      sequenceRef.current = newSeq
+      Tone.getDraw().schedule(() => setSequence(newSeq), time)
+    }
+
     drillItemIdxRef.current = nextIdx
 
     // Play root note only when actually revealing a chord (not the first beat)
@@ -185,16 +198,16 @@ export default function LearnChords() {
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const refVoicings = useMemo(
-    () => getChordVoicings(root, quality),
+    () => getChordVoicings(root, quality).sort((a, b) => a.fretFrom - b.fretFrom),
     [root, quality],
   )
   const clampedVoicingIdx = Math.min(voicingIdx, Math.max(0, refVoicings.length - 1))
 
   // Challenge = what to find (name shown, no dots); Revealed = previous answer (dots shown).
   // drillItemIdx starts at -1, so nothing is shown until the first beat fires.
-  const challengeDrillItem = drillMode && drillStarted && drillItemIdx >= 0 ? drillItems[drillItemIdx] : null
+  const challengeDrillItem = drillMode && drillStarted && drillItemIdx >= 0 ? sequence[drillItemIdx] : null
   const revealedDrillItem = drillMode && drillStarted && revealedItemIdx >= 0
-    ? drillItems[revealedItemIdx] : null
+    ? sequence[revealedItemIdx] : null
 
   const { dots, fretFrom, fretTo } = useMemo((): {
     dots: FretDot[]
@@ -428,7 +441,7 @@ export default function LearnChords() {
             {challengeDrillItem?.shapeName} shape
           </div>
           <div className={`text-fg-muted text-xs font-mono ${!challengeDrillItem ? 'invisible' : ''}`}>
-            {drillItemIdx >= 0 ? `${drillItemIdx + 1} / ${drillItems.length}` : `— / ${drillItems.length}`}
+            {drillItemIdx >= 0 ? `${drillItemIdx + 1} / ${sequence.length}` : `— / ${sequence.length}`}
           </div>
         </div>
       )}
@@ -487,10 +500,14 @@ export default function LearnChords() {
           >
             ←
           </button>
-          <span className="text-fg-secondary text-sm font-mono">
-            {refVoicings.length > 0
-              ? `${clampedVoicingIdx + 1} / ${refVoicings.length}`
-              : 'No voicings'}
+          <span className="text-fg-secondary text-sm font-mono flex items-center gap-2">
+            {refVoicings.length > 0 ? (
+              <>
+                <span>{clampedVoicingIdx + 1} / {refVoicings.length}</span>
+                <span className="text-fg-muted">·</span>
+                <span className="text-fg-primary font-semibold">{refVoicings[clampedVoicingIdx]?.shapeName} shape</span>
+              </>
+            ) : 'No voicings'}
           </span>
           <button
             onClick={() => setVoicingIdx(i => Math.min(refVoicings.length - 1, i + 1))}
