@@ -61,10 +61,85 @@ export function intervalLabel(interval: string): string {
 }
 
 
+export type ShapeName = 'E' | 'A' | 'G' | 'C' | 'D'
+
 export interface ChordVoicing {
   strings: number[]  // 6 elements, index 0 = low E; fret number or -1 (muted)
   fretFrom: number
   fretTo: number
+  shapeName?: ShapeName
+}
+
+interface CagedTemplate {
+  rootStrIdx: number
+  offsets: (number | null)[]
+}
+
+const CAGED_TEMPLATES: Record<ShapeName, Record<string, CagedTemplate>> = {
+  E: {
+    M:    { rootStrIdx: 0, offsets: [0,    2,    2,    1,    0,    0   ] },
+    m:    { rootStrIdx: 0, offsets: [0,    2,    2,    0,    0,    0   ] },
+    '7':  { rootStrIdx: 0, offsets: [0,    2,    0,    1,    0,    0   ] },
+    maj7: { rootStrIdx: 0, offsets: [0,    2,    1,    1,    0,    0   ] },
+    m7:   { rootStrIdx: 0, offsets: [0,    2,    0,    0,    0,    0   ] },
+  },
+  A: {
+    M:    { rootStrIdx: 1, offsets: [null, 0,    2,    2,    2,    0   ] },
+    m:    { rootStrIdx: 1, offsets: [null, 0,    2,    2,    1,    0   ] },
+    '7':  { rootStrIdx: 1, offsets: [null, 0,    2,    0,    2,    0   ] },
+    maj7: { rootStrIdx: 1, offsets: [null, 0,    2,    1,    2,    0   ] },
+    m7:   { rootStrIdx: 1, offsets: [null, 0,    2,    0,    1,    0   ] },
+  },
+  G: {
+    M:    { rootStrIdx: 0, offsets: [0,   -1,   -3,   -3,   -3,    0  ] },
+    m:    { rootStrIdx: 0, offsets: [0,   -2,   -3,   -3,    0,    0  ] },
+    '7':  { rootStrIdx: 0, offsets: [0,   -1,   -3,   -3,   -3,   -2  ] },
+    maj7: { rootStrIdx: 0, offsets: [0,   -1,   -3,   -3,   -3,   -1  ] },
+    m7:   { rootStrIdx: 0, offsets: [0,   -2,   -3,   -3,    0,   -2  ] },
+  },
+  C: {
+    M:    { rootStrIdx: 1, offsets: [null, 0,   -1,   -3,   -2,   -3  ] },
+    m:    { rootStrIdx: 1, offsets: [null, 0,   -2,   -3,   -2,    0  ] },
+    '7':  { rootStrIdx: 1, offsets: [null, 0,   -1,    0,   -2,   -3  ] },
+    maj7: { rootStrIdx: 1, offsets: [null, 0,   -1,   -3,   -3,    0  ] },
+    m7:   { rootStrIdx: 1, offsets: [null, 0,   -2,    0,   -2,    0  ] },
+  },
+  D: {
+    M:    { rootStrIdx: 2, offsets: [null, null, 0,    2,    3,    2  ] },
+    m:    { rootStrIdx: 2, offsets: [null, null, 0,    2,    3,    1  ] },
+    '7':  { rootStrIdx: 2, offsets: [null, null, 0,    2,    1,    2  ] },
+    maj7: { rootStrIdx: 2, offsets: [null, null, 0,    2,    2,    2  ] },
+    m7:   { rootStrIdx: 2, offsets: [null, null, 0,    2,    1,    1  ] },
+  },
+}
+
+export function getCagedVoicing(
+  root: string,
+  symbol: string,
+  shapeName: ShapeName,
+): ChordVoicing | null {
+  const template = CAGED_TEMPLATES[shapeName]?.[symbol]
+  if (!template) return null
+
+  const rootFret = getFretForNote(template.rootStrIdx, root)
+  if (rootFret === -1) return null
+
+  const strings = template.offsets.map(offset =>
+    offset === null ? -1 : rootFret + offset,
+  )
+
+  if (strings.some(f => f !== -1 && (f < 0 || f > 12))) return null
+
+  const played = strings.filter(f => f !== -1)
+  if (played.length < 3) return null
+  const fretMin = Math.min(...played)
+  const fretMax = Math.max(...played)
+  return {
+    strings,
+    fretFrom: fretMin,
+    fretTo: Math.max(fretMin + 5, fretMax + 1),
+    shapeName,
+  }
 }
 
 /** All neck positions (frets 0–12) where a chord tone appears. */
@@ -107,117 +182,9 @@ export function getChordNeckDots(
   return dots
 }
 
-/** Up to 5 playable voicings across the neck scored by quality. */
+/** Up to 5 CAGED-based voicings (one per shape: E, A, G, C, D). */
 export function getChordVoicings(root: string, symbol: string): ChordVoicing[] {
-  const chord = Chord.get(root + symbol)
-  if (!chord.notes.length) return []
-
-  const chromaToInterval = new Map<number, string>()
-  chord.notes.forEach((n, i) => {
-    const chroma = Note.chroma(n)
-    if (chroma !== undefined) chromaToInterval.set(chroma, chord.intervals[i])
-  })
-  const noteSet = new Set(chromaToInterval.keys())
-
-  const results: { strings: number[]; score: number; fretFrom: number; fretTo: number }[] = []
-  const seen = new Set<string>()
-
-  for (let startFret = 0; startFret <= 8; startFret++) {
-    // Candidate frets per string within this 5-fret window
-    const candidates: number[][] = Array.from({ length: 6 }, (_, strIdx) => {
-      const opts = [-1]  // -1 = muted
-      for (let fret = startFret; fret <= startFret + 4; fret++) {
-        const note = FRETBOARD_NOTES[strIdx][fret]?.replace(/\d/g, '')
-        const chroma = note !== undefined ? Note.chroma(note) : undefined
-        if (chroma !== undefined && noteSet.has(chroma)) opts.push(fret)
-      }
-      return opts
-    })
-
-    const dfs = (
-      strIdx: number,
-      current: number[],
-      nonOpenFrets: number[],
-      hasRoot: boolean,
-    ): void => {
-      if (results.length >= 25) return  // limit before dedup
-
-      if (strIdx === 6) {
-        const played = current.filter(f => f !== -1)
-        if (played.length < 4 || !hasRoot) return
-
-        // Span check (open strings excluded)
-        if (nonOpenFrets.length >= 2) {
-          const min = Math.min(...nonOpenFrets)
-          const max = Math.max(...nonOpenFrets)
-          if (max - min > 4) return
-        }
-
-        const key = current.join(',')
-        if (seen.has(key)) return
-        seen.add(key)
-
-        // Coverage check
-        const presentChromas = new Set(
-          current.flatMap((fret, si) => {
-            if (fret === -1) return []
-            const note = FRETBOARD_NOTES[si][fret]?.replace(/\d/g, '')
-            const chroma = note !== undefined ? Note.chroma(note) : undefined
-            return chroma !== undefined ? [chroma] : []
-          }),
-        )
-        const allPresent = [...noteSet].every(c => presentChromas.has(c))
-
-        const lowestStr = current.findIndex(f => f !== -1)
-        const lowestNote =
-          lowestStr !== -1
-            ? FRETBOARD_NOTES[lowestStr][current[lowestStr]]?.replace(/\d/g, '')
-            : undefined
-        const lowestChroma = lowestNote !== undefined ? Note.chroma(lowestNote) : undefined
-        const rootOnLowest =
-          lowestChroma !== undefined && chromaToInterval.get(lowestChroma) === '1P'
-
-        let score = played.length
-        if (allPresent) score += 10
-        if (rootOnLowest) score += 5
-        score -= current.filter(f => f === -1).length
-
-        const fretMin = Math.min(...played)
-        const fretMax = Math.max(...played)
-        results.push({
-          strings: current.slice(),
-          score,
-          fretFrom: fretMin,
-          fretTo: Math.max(fretMin + 5, fretMax + 1),
-        })
-        return
-      }
-
-      for (const fret of candidates[strIdx]) {
-        const newNonOpen = fret > 0 ? [...nonOpenFrets, fret] : nonOpenFrets
-
-        // Early prune on span
-        if (newNonOpen.length >= 2) {
-          const min = Math.min(...newNonOpen)
-          const max = Math.max(...newNonOpen)
-          if (max - min > 4) continue
-        }
-
-        const note = fret !== -1 ? FRETBOARD_NOTES[strIdx][fret]?.replace(/\d/g, '') : undefined
-        const chroma = note !== undefined ? Note.chroma(note) : undefined
-        const isRoot = chroma !== undefined && chromaToInterval.get(chroma) === '1P'
-
-        dfs(strIdx + 1, [...current, fret], newNonOpen, hasRoot || isRoot)
-      }
-    }
-
-    dfs(0, [], [], false)
-  }
-
-  results.sort((a, b) => b.score - a.score)
-  return results.slice(0, 5).map(r => ({
-    strings: r.strings,
-    fretFrom: r.fretFrom,
-    fretTo: r.fretTo,
-  }))
+  return (['E', 'A', 'G', 'C', 'D'] as ShapeName[])
+    .map(s => getCagedVoicing(root, symbol, s))
+    .filter((v): v is ChordVoicing => v !== null)
 }

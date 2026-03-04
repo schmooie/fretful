@@ -7,11 +7,12 @@ import {
   ROOTS,
   CHORD_QUALITIES,
   FRETBOARD_NOTES,
-  getFretForNote,
   getChordNeckDots,
   getChordVoicings,
+  getCagedVoicing,
   intervalLabel,
   ChordVoicing,
+  ShapeName,
 } from '../../lib/music'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -25,22 +26,16 @@ const DRILL_QUALITIES = [
   { label: 'Min 7',  symbol: 'm7'   },
 ]
 
-// Strings used as root positions (indices into FRETBOARD_NOTES / ChordVoicing.strings)
-const DRILL_ROOT_STRINGS = [0, 1, 2, 3]  // low E, A, D, G
-const ROOT_STRING_LABELS = ['6th (low E)', '5th (A)', '4th (D)', '3rd (G)']
+const CAGED_SHAPES: ShapeName[] = ['E', 'A', 'G', 'C', 'D']
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function voicingToFretDots(voicing: ChordVoicing, root: string, symbol: string): FretDot[] {
   const chord = Chord.get(root + symbol)
   const chromaToInterval = new Map<number, string>()
-  const chromaToNote = new Map<number, string>()
   chord.notes.forEach((n, i) => {
     const chroma = Note.chroma(n)
-    if (chroma !== undefined) {
-      chromaToInterval.set(chroma, chord.intervals[i])
-      chromaToNote.set(chroma, Note.get(n).pc ?? n)
-    }
+    if (chroma !== undefined) chromaToInterval.set(chroma, chord.intervals[i])
   })
 
   return voicing.strings
@@ -54,7 +49,6 @@ function voicingToFretDots(voicing: ChordVoicing, root: string, symbol: string):
       return {
         string: fbString,
         fret,
-        note: chromaToNote.get(chroma)!,
         interval: intervalLabel(chromaToInterval.get(chroma)!),
       }
     })
@@ -64,21 +58,17 @@ function voicingToFretDots(voicing: ChordVoicing, root: string, symbol: string):
 interface DrillItem {
   qualitySymbol: string
   qualityLabel: string
-  strIdx: number    // 0=low E … 3=G
-  rootFret: number
-  voicing: ChordVoicing | null
+  shapeName: ShapeName
+  voicing: ChordVoicing
 }
 
 function buildDrillItems(root: string, enabledSymbols: string[]): DrillItem[] {
   const items: DrillItem[] = []
   for (const q of DRILL_QUALITIES.filter(q => enabledSymbols.includes(q.symbol))) {
-    const voicings = getChordVoicings(root, q.symbol)
-    for (const strIdx of DRILL_ROOT_STRINGS) {
-      const rootFret = getFretForNote(strIdx, root)
-      if (rootFret === -1) continue
-      const voicing =
-        voicings.find(v => v.strings[strIdx] === rootFret) ?? voicings[0] ?? null
-      items.push({ qualitySymbol: q.symbol, qualityLabel: q.label, strIdx, rootFret, voicing })
+    for (const shapeName of CAGED_SHAPES) {
+      const voicing = getCagedVoicing(root, q.symbol, shapeName)
+      if (!voicing) continue
+      items.push({ qualitySymbol: q.symbol, qualityLabel: q.label, shapeName, voicing })
     }
   }
   return items
@@ -145,7 +135,9 @@ export default function LearnChords() {
     // Play the root note at the exact transport time
     try {
       const item = items[nextIdx]
-      const rootNote = FRETBOARD_NOTES[item.strIdx][item.rootFret]?.replace(/\d/g, '') ?? 'C'
+      const lowestStrIdx = item.voicing.strings.findIndex(f => f !== -1)
+      const rootFret = item.voicing.strings[lowestStrIdx]
+      const rootNote = FRETBOARD_NOTES[lowestStrIdx][rootFret]?.replace(/\d/g, '') ?? 'C'
       synthRef.current?.triggerAttackRelease(`${rootNote}3`, '8n', time)
     } catch { /* ignore */ }
 
@@ -344,7 +336,8 @@ export default function LearnChords() {
             <div className="text-zinc-600 text-xs mt-2">
               {drillItems.length} positions in this drill
               {drillItems.length > 0 && (
-                <> ({drillEnabledSymbols.length} quality × {DRILL_ROOT_STRINGS.length} strings)</>
+                <> ({drillEnabledSymbols.length} quality × {CAGED_SHAPES.length} shapes)</>
+
               )}
             </div>
           </div>
@@ -359,7 +352,7 @@ export default function LearnChords() {
             <span className="text-zinc-200">{currentDrillItem.qualityLabel}</span>
           </div>
           <div className="text-zinc-400 text-sm">
-            root on {ROOT_STRING_LABELS[currentDrillItem.strIdx]}, fret {currentDrillItem.rootFret}
+            {currentDrillItem.shapeName} shape
           </div>
           <div className="text-zinc-600 text-xs font-mono">
             {drillItemIdx + 1} / {drillItems.length}
