@@ -121,37 +121,45 @@ export default function LearnChords() {
     [drillMode, drillRoot, drillEnabledSymbols],
   )
 
-  // Keep ref in sync for beat callback; initialise when items change
+  // Keep ref in sync for beat callback; initialise when items change.
+  // Start at -1 so the first beat introduces challenge 0 (no dots yet),
+  // and the second beat reveals challenge 0's dots + introduces challenge 1.
   useEffect(() => {
     drillItemsRef.current = drillItems
     if (drillItems.length > 0) {
-      setDrillItemIdx(0)
-      drillItemIdxRef.current = 0
+      setDrillItemIdx(-1)
+      drillItemIdxRef.current = -1
       setRevealedItemIdx(-1)
       revealedItemIdxRef.current = -1
     }
   }, [drillItems])
 
   // ── Beat callback ────────────────────────────────────────────────────────
-  // Each beat: reveal current challenge's dots, advance to next challenge
+  // On each downbeat: reveal the previous challenge's dots, introduce the next.
+  // drillItemIdx starts at -1, so:
+  //   beat 1 → reveal=-1 (no dots), challenge=0 (first chord shown)
+  //   beat 2 → reveal=0  (dots appear), challenge=1
+  //   beat N → reveal=N-2, challenge=N-1
   const onBeat = useCallback((beat: number, time: number) => {
     if (beat !== 0) return
     const items = drillItemsRef.current
     if (!items.length) return
 
-    const toReveal = drillItemIdxRef.current
+    const toReveal = drillItemIdxRef.current                          // -1 on first beat
     revealedItemIdxRef.current = toReveal
-    const nextIdx = (toReveal + 1) % items.length
+    const nextIdx = toReveal < 0 ? 0 : (toReveal + 1) % items.length // 0 on first beat
     drillItemIdxRef.current = nextIdx
 
-    // Play root note of the item being revealed
-    try {
-      const item = items[toReveal]
-      const lowestStrIdx = item.voicing.strings.findIndex(f => f !== -1)
-      const rootFret = item.voicing.strings[lowestStrIdx]
-      const rootNote = FRETBOARD_NOTES[lowestStrIdx][rootFret]?.replace(/\d/g, '') ?? 'C'
-      synthRef.current?.triggerAttackRelease(`${rootNote}3`, '8n', time)
-    } catch { /* ignore */ }
+    // Play root note only when actually revealing a chord (not the first beat)
+    if (toReveal >= 0) {
+      try {
+        const item = items[toReveal]
+        const lowestStrIdx = item.voicing.strings.findIndex(f => f !== -1)
+        const rootFret = item.voicing.strings[lowestStrIdx]
+        const rootNote = FRETBOARD_NOTES[lowestStrIdx][rootFret]?.replace(/\d/g, '') ?? 'C'
+        synthRef.current?.triggerAttackRelease(`${rootNote}3`, '8n', time)
+      } catch { /* ignore */ }
+    }
 
     Tone.getDraw().schedule(() => {
       setRevealedItemIdx(toReveal)
@@ -182,8 +190,9 @@ export default function LearnChords() {
   )
   const clampedVoicingIdx = Math.min(voicingIdx, Math.max(0, refVoicings.length - 1))
 
-  // Challenge = what to find (name shown, no dots); Revealed = previous answer (dots shown)
-  const challengeDrillItem = drillMode && drillStarted ? drillItems[drillItemIdx] : null
+  // Challenge = what to find (name shown, no dots); Revealed = previous answer (dots shown).
+  // drillItemIdx starts at -1, so nothing is shown until the first beat fires.
+  const challengeDrillItem = drillMode && drillStarted && drillItemIdx >= 0 ? drillItems[drillItemIdx] : null
   const revealedDrillItem = drillMode && drillStarted && revealedItemIdx >= 0
     ? drillItems[revealedItemIdx] : null
 
@@ -192,6 +201,11 @@ export default function LearnChords() {
     fretFrom: number
     fretTo: number
   } => {
+    // Drill active but nothing revealed yet — show a blank neck
+    if (drillMode && drillStarted && !revealedDrillItem) {
+      return { dots: [], fretFrom: 0, fretTo: 12 }
+    }
+
     // Drill active: show dots for the revealed item (previous challenge)
     if (drillMode && drillStarted && revealedDrillItem?.voicing) {
       return {
@@ -391,17 +405,18 @@ export default function LearnChords() {
       )}
 
       {/* ── Drill playing: current chord ── */}
-      {drillMode && drillStarted && challengeDrillItem && (
+      {/* Always rendered when drillStarted so space is reserved before beat 1 fires */}
+      {drillMode && drillStarted && (
         <div className="flex flex-col items-center gap-1.5">
-          <div className="text-4xl font-bold font-display text-center">
+          <div className={`text-4xl font-bold font-display text-center ${!challengeDrillItem ? 'invisible' : ''}`}>
             <span className="text-ui-warning">{drillRoot}</span>{' '}
-            <span className="text-fg-primary">{challengeDrillItem.qualityLabel}</span>
+            <span className="text-fg-primary">{challengeDrillItem?.qualityLabel ?? '—'}</span>
           </div>
-          <div className="text-fg-secondary text-sm">
-            {challengeDrillItem.shapeName} shape
+          <div className={`text-fg-secondary text-sm ${!challengeDrillItem ? 'invisible' : ''}`}>
+            {challengeDrillItem?.shapeName} shape
           </div>
-          <div className="text-fg-muted text-xs font-mono">
-            {drillItemIdx + 1} / {drillItems.length}
+          <div className={`text-fg-muted text-xs font-mono ${!challengeDrillItem ? 'invisible' : ''}`}>
+            {drillItemIdx >= 0 ? `${drillItemIdx + 1} / ${drillItems.length}` : `— / ${drillItems.length}`}
           </div>
         </div>
       )}
