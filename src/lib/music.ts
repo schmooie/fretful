@@ -1,4 +1,4 @@
-import { Scale, Chord, Note, Interval } from 'tonal'
+import { Chord, Note, Interval } from 'tonal'
 
 export const GUITAR_STRINGS = ['E2', 'A2', 'D3', 'G3', 'B3', 'E4']
 
