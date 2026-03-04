@@ -1,12 +1,15 @@
+import { useState, useEffect } from 'react'
 import { start } from 'tone'
 import { useMetronome } from '../contexts/MetronomeContext'
 import { useMetronomeEngine } from '../hooks/useMetronomeEngine'
 
 const TIME_SIGS = [
+  { label: '2/4', beats: 2 },
   { label: '3/4', beats: 3 },
   { label: '4/4', beats: 4 },
   { label: '5/4', beats: 5 },
   { label: '6/8', beats: 6 },
+  { label: '7/8', beats: 7 },
 ]
 
 export default function MetronomePanel() {
@@ -14,53 +17,66 @@ export default function MetronomePanel() {
 
   useMetronomeEngine()
 
+  const [bpmInput, setBpmInput] = useState(String(bpm))
+
+  useEffect(() => { setBpmInput(String(bpm)) }, [bpm])
+
+  const commitBpm = (val: string) => {
+    const n = parseInt(val, 10)
+    const clamped = isNaN(n) ? bpm : Math.max(20, Math.min(300, n))
+    setBpm(clamped)
+    setBpmInput(String(clamped))
+  }
+
   const toggle = async () => {
     await start()
     setIsPlaying(!isPlaying)
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-16 bg-zinc-900 border-t border-zinc-700 grid grid-cols-[1fr_auto_1fr] items-center px-4 gap-4 z-50">
-      {/* Left: empty spacer */}
+    <div className="fixed bottom-0 left-0 right-0 h-16 bg-surface-1 border-t border-border-strong grid grid-cols-[1fr_auto_1fr] items-center px-4 gap-4 z-50">
+
+      {/* Left: spacer */}
       <div />
 
       {/* Center: controls */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-5">
+
+        {/* Time signature dropdown */}
+        <select
+          value={beatsPerMeasure}
+          onChange={e => setBeatsPerMeasure(Number(e.target.value))}
+          className="h-8 px-3 rounded-lg bg-surface-2 text-fg-primary font-mono text-sm appearance-none cursor-pointer hover:bg-surface-3 transition border-0 outline-none"
+          style={{ textAlignLast: 'center' }}
+        >
+          {TIME_SIGS.map(ts => (
+            <option key={ts.label} value={ts.beats}>{ts.label}</option>
+          ))}
+        </select>
+
+        {/* Play/Stop */}
         <button
           onClick={toggle}
-          className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-700 hover:bg-zinc-600 text-white text-lg transition"
+          className="w-12 h-12 rounded-full flex items-center justify-center bg-surface-3 hover:bg-surface-3 text-fg-primary text-xs font-display transition"
           aria-label={isPlaying ? 'Stop' : 'Play'}
         >
           {isPlaying ? '⏹' : '▶'}
         </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setBpm(Math.max(20, bpm - 5))}
-            className="w-7 h-7 rounded bg-zinc-700 hover:bg-zinc-600 text-white text-sm"
-          >−</button>
-          <span className="text-white font-mono text-sm w-14 text-center">{bpm} BPM</span>
-          <button
-            onClick={() => setBpm(Math.min(300, bpm + 5))}
-            className="w-7 h-7 rounded bg-zinc-700 hover:bg-zinc-600 text-white text-sm"
-          >+</button>
+        {/* BPM input */}
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={bpmInput}
+            onChange={e => setBpmInput(e.target.value)}
+            onBlur={e => commitBpm(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { commitBpm(bpmInput); e.currentTarget.blur() } }}
+            className="w-12 h-8 rounded bg-surface-2 text-fg-primary font-mono text-sm text-center border-0 outline-none focus:ring-1 focus:ring-border-strong"
+          />
+          <span className="text-fg-secondary font-mono text-sm">BPM</span>
         </div>
 
-        <div className="flex gap-1">
-          {TIME_SIGS.map(ts => (
-            <button
-              key={ts.label}
-              onClick={() => setBeatsPerMeasure(ts.beats)}
-              className={`px-2 py-1 rounded text-xs font-mono transition ${
-                beatsPerMeasure === ts.beats
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
-              }`}
-            >
-              {ts.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Right: beat indicators */}
@@ -68,14 +84,15 @@ export default function MetronomePanel() {
         {Array.from({ length: beatsPerMeasure }).map((_, i) => (
           <div
             key={i}
-            className={`w-4 h-4 rounded-full transition-colors duration-75 ${
+            className={`w-3 h-3 rounded-full transition-colors duration-75 ${
               isPlaying && currentBeat === i
-                ? i === 0 ? 'bg-amber-400' : 'bg-sky-400'
-                : 'bg-zinc-600'
+                ? i === 0 ? 'bg-ui-warning' : 'bg-ui-info'
+                : 'bg-surface-3'
             }`}
           />
         ))}
       </div>
+
     </div>
   )
 }

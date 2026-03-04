@@ -1,69 +1,174 @@
 @import "tailwindcss";
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Color system — designed for dark background (~#0f0e0c)
-   Each note stores hue / saturation / lightness as separate custom properties
-   so they can be composed and overridden without repetition.
+@theme {
+  --font-display: 'IBM Plex Sans', sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
 
-   Two layers:
-     1. Chromatic (12-tone, C-anchored) — --note-{name}-{h|s|l}
-     2. Interval function (Root / Third / Fifth) — --interval-{fn}-{h|s|l}
+  /* ── Backgrounds — generate bg-base, bg-surface-1, etc. ── */
+  --color-base:          var(--bg-base);
+  --color-surface-1:     var(--bg-surface-1);
+  --color-surface-2:     var(--bg-surface-2);
+  --color-surface-3:     var(--bg-surface-3);
 
-   C intentionally shares Root; G intentionally shares Fifth.
-   Text contrast is hardcoded (HSL lightness alone is perceptually unreliable).
-   ═══════════════════════════════════════════════════════════════════════════ */
+  /* ── Borders — generate border-border, border-border-strong ── */
+  --color-border:        var(--border);
+  --color-border-strong: var(--border-strong);
 
-:root {
-  /* ── Chromatic note custom properties ─────────────────────────────────── */
-  --note-c-h:  11;  --note-c-s:  100%;  --note-c-l:  59%;
-  --note-cs-h: 22;  --note-cs-s: 100%;  --note-cs-l: 55%;
-  --note-d-h:  35;  --note-d-s:  100%;  --note-d-l:  50%;
-  --note-ds-h: 50;  --note-ds-s: 100%;  --note-ds-l: 57%;
-  --note-e-h:  76;  --note-e-s:  79%;   --note-e-l:  56%;
-  --note-f-h:  136; --note-f-s:  55%;   --note-f-l:  55%;
-  --note-fs-h: 170; --note-fs-s: 75%;   --note-fs-l: 42%;
-  --note-g-h:  180; --note-g-s:  60%;   --note-g-l:  53%;
-  --note-gs-h: 203; --note-gs-s: 78%;   --note-gs-l: 54%;
-  --note-a-h:  224; --note-a-s:  100%;  --note-a-l:  65%;
-  --note-as-h: 258; --note-as-s: 89%;   --note-as-l: 66%;
-  --note-b-h:  325; --note-b-s:  60%;   --note-b-l:  52%;
+  /* ── Foreground text (fg- prefix avoids text-text- double) ── */
+  --color-fg-primary:    var(--text-primary);
+  --color-fg-secondary:  var(--text-secondary);
+  --color-fg-muted:      var(--text-muted);
+  --color-fg-inverse:    var(--text-inverse);
 
-  /* ── Interval function custom properties ──────────────────────────────── */
-  --interval-root-h:  11;  --interval-root-s:  100%; --interval-root-l:  59%;
-  --interval-third-h: 50;  --interval-third-s: 100%; --interval-third-l: 57%;
-  --interval-fifth-h: 180; --interval-fifth-s: 60%;  --interval-fifth-l: 53%;
+  /* ── UI semantic — generate bg-ui-*, text-ui-*, hover:bg-ui-*-hover ── */
+  --color-ui-primary:           var(--ui-primary);
+  --color-ui-primary-hover:     var(--ui-primary-hover);
+  --color-ui-primary-active:    var(--ui-primary-active);
+  --color-ui-success:           var(--ui-success);
+  --color-ui-success-hover:     var(--ui-success-hover);
+  --color-ui-info:              var(--ui-info);
+  --color-ui-warning:           var(--ui-warning);
+  --color-ui-destructive:       var(--ui-destructive);
+  --color-ui-destructive-hover: var(--ui-destructive-hover);
 }
 
-/* ── Chromatic note utility classes ──────────────────────────────────────── */
-/* bg = note fill; color = hardcoded text contrast (perceptually verified)   */
+/* ─────────────────────────────────────────────────────────────────────────
+   COLOR SYSTEM — TWO TIERS
 
-.note-c  { background-color: hsl(var(--note-c-h),  var(--note-c-s),  var(--note-c-l));  color: white;    }
-.note-cs { background-color: hsl(var(--note-cs-h), var(--note-cs-s), var(--note-cs-l)); color: white;    }
-.note-d  { background-color: hsl(var(--note-d-h),  var(--note-d-s),  var(--note-d-l));  color: #1a0800;  }
-.note-ds { background-color: hsl(var(--note-ds-h), var(--note-ds-s), var(--note-ds-l)); color: #1a1000;  }
-.note-e  { background-color: hsl(var(--note-e-h),  var(--note-e-s),  var(--note-e-l));  color: #151c00;  }
-.note-f  { background-color: hsl(var(--note-f-h),  var(--note-f-s),  var(--note-f-l));  color: #001a0a;  }
-.note-fs { background-color: hsl(var(--note-fs-h), var(--note-fs-s), var(--note-fs-l)); color: #001a15;  }
-.note-g  { background-color: hsl(var(--note-g-h),  var(--note-g-s),  var(--note-g-l));  color: #001a1a;  }
-.note-gs { background-color: hsl(var(--note-gs-h), var(--note-gs-s), var(--note-gs-l)); color: #001424;  }
-.note-a  { background-color: hsl(var(--note-a-h),  var(--note-a-s),  var(--note-a-l));  color: white;    }
-.note-as { background-color: hsl(var(--note-as-h), var(--note-as-s), var(--note-as-l)); color: white;    }
-.note-b  { background-color: hsl(var(--note-b-h),  var(--note-b-s),  var(--note-b-l));  color: white;    }
+   Tier 1  (--note-*, --interval-*):
+   Semantic pitch colors. Every color corresponds to a specific musical note
+   or interval role. C = Root hue, G = Fifth hue, etc.
+   NEVER use for UI chrome, states, badges, or decoration.
 
-/* ── Interval function utility classes ───────────────────────────────────── */
+   Tier 2  (--ui-*):
+   Interface colors derived from the same hue family but at lower
+   lightness / saturation so they read as controls, not as pitches.
+   NEVER use to represent a specific note or interval.
 
-.interval-root  { background-color: hsl(var(--interval-root-h),  var(--interval-root-s),  var(--interval-root-l));  color: white;    }
-.interval-third { background-color: hsl(var(--interval-third-h), var(--interval-third-s), var(--interval-third-l)); color: #1a1000;  }
-.interval-fifth { background-color: hsl(var(--interval-fifth-h), var(--interval-fifth-s), var(--interval-fifth-l)); color: #001a1a;  }
+   The two tiers are close in hue by design — they must never be used
+   interchangeably. If --ui-primary and --interval-root appear adjacent,
+   that is a sign something is miscategorized.
+───────────────────────────────────────────────────────────────────────── */
+
+:root {
+
+  /* ─────────────────────────────────────────────
+     TYPOGRAPHY
+     --font-display : headings, titles, stat numbers,
+                      button labels, nav items, modals
+     --font-mono    : everything else — labels, copy,
+                      chord symbols, note names, tab,
+                      fret numbers, badges, eyebrows
+  ───────────────────────────────────────────── */
+  --font-display: 'IBM Plex Sans', sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
+
+
+  /* ─────────────────────────────────────────────
+     BACKGROUNDS
+     Warm-tinted surface stack. Elevation increases
+     with each level — do not skip levels.
+  ───────────────────────────────────────────── */
+  --bg-base:       hsl(38, 14%,  6%);   /* page background                         */
+  --bg-surface-1:  hsl(37, 12%, 10%);   /* cards, panels, sidebars                 */
+  --bg-surface-2:  hsl(36, 11%, 13%);   /* elevated elements, inputs               */
+  --bg-surface-3:  hsl(35, 10%, 17%);   /* modals, popovers, dropdowns, active els */
+  --border:        hsl(35, 10%, 18%);   /* subtle dividers                         */
+  --border-strong: hsl(35, 12%, 26%);   /* input outlines, prominent dividers      */
+
+
+  /* ─────────────────────────────────────────────
+     TEXT
+     All neutrals pulled warm to match bg tone.
+     Never use note or UI colors for body text.
+  ───────────────────────────────────────────── */
+  --text-primary:   hsl(40, 20%, 91%);  /* headings, body, primary labels          */
+  --text-secondary: hsl(38, 12%, 55%);  /* metadata, supporting info               */
+  --text-muted:     hsl(36, 10%, 35%);  /* disabled, placeholder, decorative       */
+  --text-inverse:   hsl(38, 14%,  6%);  /* text on light-colored backgrounds       */
+
+
+  /* ─────────────────────────────────────────────
+     Tier 1: Interval functions
+     Highest protection — never repurpose.
+  ───────────────────────────────────────────── */
+  --interval-root:  hsl(11,  100%, 59%);
+  --interval-third: hsl(50,  100%, 57%);
+  --interval-fifth: hsl(180,  60%, 53%);
+
+  /* ─────────────────────────────────────────────
+     Tier 1: Chromatic notes (12-TET, C-anchored)
+  ───────────────────────────────────────────── */
+  --note-c:  hsl(11,  100%, 59%);
+  --note-cs: hsl(22,  100%, 55%);
+  --note-d:  hsl(35,  100%, 50%);
+  --note-ds: hsl(50,  100%, 57%);
+  --note-e:  hsl(76,   79%, 56%);
+  --note-f:  hsl(136,  55%, 55%);
+  --note-fs: hsl(170,  75%, 42%);
+  --note-g:  hsl(180,  60%, 53%);
+  --note-gs: hsl(203,  78%, 54%);
+  --note-a:  hsl(224, 100%, 65%);
+  --note-as: hsl(258,  89%, 66%);
+  --note-b:  hsl(325,  60%, 52%);
+
+  /* ─────────────────────────────────────────────
+     Tier 2: UI semantic colors
+     Same hue family, lower lightness + saturation.
+     Text-on-color (perceptually verified):
+       --ui-primary     → white
+       --ui-success     → white
+       --ui-info        → white
+       --ui-warning     → var(--text-inverse)  (#1a0e00 equiv)
+       --ui-destructive → white
+  ───────────────────────────────────────────── */
+  --ui-primary:           hsl(11,  85%, 52%);   /* root hue, darkened — CTAs, active states  */
+  --ui-primary-hover:     hsl(11,  85%, 46%);
+  --ui-primary-active:    hsl(11,  85%, 40%);
+
+  --ui-success:           hsl(136, 45%, 42%);   /* F hue, darker + desaturated — positive    */
+  --ui-success-hover:     hsl(136, 45%, 36%);
+
+  --ui-info:              hsl(203, 60%, 45%);   /* G# hue, darker — informational            */
+
+  --ui-warning:           hsl(35,  90%, 45%);   /* D hue, darker — warnings, selection       */
+
+  --ui-destructive:       hsl(22,  90%, 48%);   /* C# hue, darker — errors, destructive      */
+  --ui-destructive-hover: hsl(22,  90%, 42%);
+}
+
+/* ── Tier 1: Chromatic note utility classes ──────────────────────────────
+   bg = note fill; color = hardcoded for perceptual contrast on that hue.
+   White: notes in dark hue range (C, C#, F#, A, A#, B).
+   var(--text-inverse): notes in light/warm hue range (D–G#).        */
+
+.note-c  { background-color: var(--note-c);  color: white;                  }
+.note-cs { background-color: var(--note-cs); color: white;                  }
+.note-d  { background-color: var(--note-d);  color: var(--text-inverse);    }
+.note-ds { background-color: var(--note-ds); color: var(--text-inverse);    }
+.note-e  { background-color: var(--note-e);  color: var(--text-inverse);    }
+.note-f  { background-color: var(--note-f);  color: var(--text-inverse);    }
+.note-fs { background-color: var(--note-fs); color: white;                  }
+.note-g  { background-color: var(--note-g);  color: var(--text-inverse);    }
+.note-gs { background-color: var(--note-gs); color: var(--text-inverse);    }
+.note-a  { background-color: var(--note-a);  color: white;                  }
+.note-as { background-color: var(--note-as); color: white;                  }
+.note-b  { background-color: var(--note-b);  color: white;                  }
+
+/* ── Tier 1: Interval function utility classes ───────────────────────── */
+
+.interval-root  { background-color: var(--interval-root);  color: white;               }
+.interval-third { background-color: var(--interval-third); color: var(--text-inverse); }
+.interval-fifth { background-color: var(--interval-fifth); color: var(--text-inverse); }
 
 /*
-  When both systems apply to the same HTML element (chromatic id + interval role),
-  keep chromatic bg and add an interval-function box-shadow ring.
+  When both systems apply to the same element (chromatic id + interval role),
+  keep chromatic bg and render the interval function as a box-shadow ring.
   Compose as: <div class="note-a interval-root">
 */
-[class*="note-"].interval-root  { box-shadow: 0 0 0 3px hsl(var(--interval-root-h),  var(--interval-root-s),  var(--interval-root-l));  }
-[class*="note-"].interval-third { box-shadow: 0 0 0 3px hsl(var(--interval-third-h), var(--interval-third-s), var(--interval-third-l)); }
-[class*="note-"].interval-fifth { box-shadow: 0 0 0 3px hsl(var(--interval-fifth-h), var(--interval-fifth-s), var(--interval-fifth-l)); }
+[class*="note-"].interval-root  { box-shadow: 0 0 0 3px var(--interval-root);  }
+[class*="note-"].interval-third { box-shadow: 0 0 0 3px var(--interval-third); }
+[class*="note-"].interval-fifth { box-shadow: 0 0 0 3px var(--interval-fifth); }
 
 * {
   box-sizing: border-box;
@@ -71,7 +176,9 @@
 
 body {
   margin: 0;
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

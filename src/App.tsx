@@ -1,15 +1,14 @@
-import { useState } from 'react'
 import { MetronomeProvider } from './contexts/MetronomeContext'
 import Layout from './components/Layout'
-import { View } from './components/Sidebar'
 import MetronomeView from './features/Metronome'
 import LearnNotes from './features/LearnNotes'
 import LearnChords from './features/LearnChords'
 import LearnTriads from './features/LearnTriads'
 import LearnScales from './features/LearnScales'
+import { useHashView } from './hooks/useHashView'
 
 function AppContent() {
-  const [view, setView] = useState<View>('learn-notes')
+  const [view, navigate] = useHashView()
 
   const renderView = () => {
     switch (view) {
@@ -22,7 +21,7 @@ function AppContent() {
   }
 
   return (
-    <Layout activeView={view} onNavigate={setView}>
+    <Layout activeView={view} onNavigate={navigate}>
       {renderView()}
     </Layout>
   )

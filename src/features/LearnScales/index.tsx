@@ -1,8 +1,8 @@
 export default function LearnScales() {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-      <h1 className="text-3xl font-bold text-zinc-200">Learn Scales</h1>
-      <p className="text-zinc-500 text-center max-w-sm">
+    <div className="flex flex-col items-center p-6 gap-4">
+      <h1 className="text-4xl font-bold font-display tracking-tight text-fg-primary">Learn Scales</h1>
+      <p className="text-fg-secondary text-center max-w-sm">
         Coming soon — choose a root and mode to see the scale across the fretboard.
       </p>
     </div>

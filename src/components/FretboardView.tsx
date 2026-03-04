@@ -54,7 +54,7 @@ function addFretMarkers(fb: Fretboard, fretFrom: number, fretTo: number) {
       circle.setAttribute('cx', `${x}%`)
       circle.setAttribute('cy', String(y))
       circle.setAttribute('r', '5')
-      circle.setAttribute('fill', '#3f3f46') // zinc-700
+      circle.style.fill = 'var(--border-strong)'
       circle.setAttribute('class', 'fret-marker')
       wrapperEl.insertBefore(circle, wrapperEl.firstChild)
     }

@@ -12,13 +12,16 @@ export default function LearnNotes() {
   const [activeStringIdx, setActiveStringIdx] = useState(0)
   const [noteQueue, setNoteQueue] = useState<string[]>(() => getChromatic(0))
   const [currentNote, setCurrentNote] = useState<string>(() => getChromatic(0)[0])
-  const [isRevealed, setIsRevealed] = useState(false)
+  const [revealedNote, setRevealedNote] = useState<string | null>(null)
+  const [revealedStringIdx, setRevealedStringIdx] = useState(0)
 
   const synthRef = useRef<Tone.Synth | null>(null)
   const noteQueueRef = useRef(noteQueue)
+  const currentNoteRef = useRef(currentNote)
   const activeStringIdxRef = useRef(activeStringIdx)
 
   useEffect(() => { noteQueueRef.current = noteQueue }, [noteQueue])
+  useEffect(() => { currentNoteRef.current = currentNote }, [currentNote])
   useEffect(() => { activeStringIdxRef.current = activeStringIdx }, [activeStringIdx])
 
   useEffect(() => {
@@ -32,8 +35,13 @@ export default function LearnNotes() {
   const onBeat = useCallback((beat: number, time: number) => {
     if (beat !== 0) return
 
+    // Capture current challenge to reveal its dot
+    const noteToReveal = currentNoteRef.current
+    const stringToReveal = activeStringIdxRef.current
+
+    // Advance queue to next challenge
     const queue = noteQueueRef.current.slice()
-    const note = queue.shift() ?? ''
+    queue.shift()  // remove current note
 
     let newQueue = queue
     if (newQueue.length === 0) {
@@ -42,24 +50,25 @@ export default function LearnNotes() {
       newQueue = getChromatic(nextIdx)
     }
 
-    // Schedule audio at the precise transport time
-    const stringRoot = GUITAR_STRINGS[activeStringIdxRef.current]
+    // Play the note being revealed at the precise transport time
+    const stringRoot = GUITAR_STRINGS[stringToReveal]
     const octave = stringRoot.replace(/[A-G#b]/g, '')
     try {
-      synthRef.current?.triggerAttackRelease(`${note}${octave}`, '8n', time)
+      synthRef.current?.triggerAttackRelease(`${noteToReveal}${octave}`, '8n', time)
     } catch {
       // ignore invalid note name
     }
 
-    // Schedule UI updates for the animation frame closest to this beat
     Tone.getDraw().schedule(() => {
+      // Reveal answer for current challenge
+      setRevealedNote(noteToReveal)
+      setRevealedStringIdx(stringToReveal)
+      // Advance to next challenge
       if (newQueue.length < noteQueueRef.current.length) {
-        // wrapped to new string
         setActiveStringIdx(activeStringIdxRef.current)
       }
       setCurrentNote(newQueue[0])
       setNoteQueue(newQueue)
-      setIsRevealed(true)
     }, time)
   }, [])
 
@@ -69,10 +78,10 @@ export default function LearnNotes() {
     return () => { beatCallbackRef.current = null }
   }, [onBeat, beatCallbackRef])
 
-  const dots: FretDot[] = isRevealed ? (() => {
-    const fret = getFretForNote(activeStringIdx, currentNote)
+  const dots: FretDot[] = revealedNote !== null ? (() => {
+    const fret = getFretForNote(revealedStringIdx, revealedNote)
     if (fret === -1) return []
-    return [{ string: 6 - activeStringIdx, fret, note: currentNote }]
+    return [{ string: 6 - revealedStringIdx, fret, note: revealedNote }]
   })() : []
 
   const switchString = (idx: number) => {
@@ -80,22 +89,21 @@ export default function LearnNotes() {
     const newQueue = getChromatic(idx)
     setNoteQueue(newQueue)
     setCurrentNote(newQueue[0])
-    setIsRevealed(false)
+    setRevealedNote(null)
   }
 
-  // noteQueue always contains currentNote at index 0 plus the remaining notes.
   // noteNumber = how many notes into the string we are (1-indexed).
-  const noteNumber = isRevealed ? 12 - noteQueue.length + 1 : 0
+  const noteNumber = revealedNote !== null ? 12 - noteQueue.length + 1 : 0
 
   return (
     <div className="flex flex-col items-center p-6 gap-6">
-      <h1 className="text-2xl font-bold text-zinc-200">Learn Notes</h1>
+      <h1 className="text-4xl font-bold font-display tracking-tight text-fg-primary">Learn Notes</h1>
 
       <div className="flex flex-col items-center gap-1">
-        <div className="text-8xl font-bold text-sky-400 font-mono min-w-32 text-center">
+        <div className="text-8xl font-bold text-ui-info font-display min-w-32 text-center">
           {currentNote}
         </div>
-        <div className="text-zinc-500 text-sm">
+        <div className="text-fg-secondary text-sm">
           {isPlaying ? `on string: ${STRING_LABELS[activeStringIdx]}` : 'Press play to start'}
         </div>
       </div>
@@ -107,8 +115,8 @@ export default function LearnNotes() {
             onClick={() => switchString(idx)}
             className={`px-3 py-1.5 rounded text-sm font-mono transition ${
               activeStringIdx === idx
-                ? 'bg-sky-600 text-white'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                ? 'bg-ui-primary text-white'
+                : 'bg-surface-2 text-fg-secondary hover:bg-surface-3'
             }`}
           >
             {label}
@@ -116,16 +124,16 @@ export default function LearnNotes() {
         ))}
       </div>
 
-      <div className="text-zinc-500 text-xs">
-        {isRevealed ? `${noteNumber} / 12 notes on this string` : '— / 12 notes on this string'}
+      <div className="text-fg-muted text-xs">
+        {revealedNote !== null ? `${noteNumber} / 12 notes on this string` : '— / 12 notes on this string'}
       </div>
 
-      <div className="w-full max-w-3xl overflow-x-auto">
-        <FretboardView dots={dots} fretFrom={0} fretTo={12} />
+      <div className="w-full max-w-[60rem] overflow-x-auto">
+        <FretboardView dots={dots} fretFrom={0} fretTo={12} dotText={d => d.note ?? ''} />
       </div>
 
       {!isPlaying && (
-        <p className="text-zinc-500 text-sm text-center max-w-sm">
+        <p className="text-fg-secondary text-sm text-center max-w-sm">
           The metronome will reveal one note per beat 1. Find it on the fretboard.
           Use the panel below to start.
         </p>

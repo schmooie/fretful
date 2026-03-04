@@ -21,16 +21,16 @@ interface SidebarProps {
 
 export default function Sidebar({ activeView, onNavigate }: SidebarProps) {
   return (
-    <nav className="w-16 bg-zinc-900 border-r border-zinc-700 flex flex-col items-center py-4 gap-2 shrink-0">
+    <nav className="w-16 bg-surface-1 border-r border-border-strong flex flex-col items-center py-4 gap-2 shrink-0">
       {NAV_ITEMS.map(item => (
         <button
           key={item.id}
           onClick={() => onNavigate(item.id)}
           title={item.label}
-          className={`flex flex-col items-center gap-0.5 w-12 py-2 rounded-lg transition text-xs ${
+          className={`flex flex-col items-center gap-0.5 w-12 py-2 rounded-lg transition text-xs font-display font-semibold ${
             activeView === item.id
-              ? 'bg-sky-700 text-white'
-              : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+              ? 'bg-ui-primary text-white'
+              : 'text-fg-secondary hover:bg-surface-2 hover:text-fg-primary'
           }`}
         >
           <span className="text-lg leading-none">{item.icon}</span>

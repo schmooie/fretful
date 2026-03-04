@@ -98,7 +98,10 @@ export default function LearnChords() {
   const [drillEnabledSymbols, setDrillEnabledSymbols] = useState<string[]>(['M', 'm'])
   const [drillItemIdx, setDrillItemIdx] = useState(0)
 
+  const [revealedItemIdx, setRevealedItemIdx] = useState(-1)
+
   const drillItemIdxRef = useRef(0)
+  const revealedItemIdxRef = useRef(-1)
   const drillItemsRef = useRef<DrillItem[]>([])
   const synthRef = useRef<Tone.Synth | null>(null)
 
@@ -118,36 +121,42 @@ export default function LearnChords() {
     [drillMode, drillRoot, drillEnabledSymbols],
   )
 
-  // Keep ref in sync for beat callback; initialise idx when items change
+  // Keep ref in sync for beat callback; initialise when items change
   useEffect(() => {
     drillItemsRef.current = drillItems
     if (drillItems.length > 0) {
-      // Start at last index so first beat advances cleanly to 0
-      const initIdx = drillItems.length - 1
-      setDrillItemIdx(initIdx)
-      drillItemIdxRef.current = initIdx
+      setDrillItemIdx(0)
+      drillItemIdxRef.current = 0
+      setRevealedItemIdx(-1)
+      revealedItemIdxRef.current = -1
     }
   }, [drillItems])
 
   // ── Beat callback ────────────────────────────────────────────────────────
+  // Each beat: reveal current challenge's dots, advance to next challenge
   const onBeat = useCallback((beat: number, time: number) => {
     if (beat !== 0) return
     const items = drillItemsRef.current
     if (!items.length) return
 
-    const nextIdx = (drillItemIdxRef.current + 1) % items.length
+    const toReveal = drillItemIdxRef.current
+    revealedItemIdxRef.current = toReveal
+    const nextIdx = (toReveal + 1) % items.length
     drillItemIdxRef.current = nextIdx
 
-    // Play the root note at the exact transport time
+    // Play root note of the item being revealed
     try {
-      const item = items[nextIdx]
+      const item = items[toReveal]
       const lowestStrIdx = item.voicing.strings.findIndex(f => f !== -1)
       const rootFret = item.voicing.strings[lowestStrIdx]
       const rootNote = FRETBOARD_NOTES[lowestStrIdx][rootFret]?.replace(/\d/g, '') ?? 'C'
       synthRef.current?.triggerAttackRelease(`${rootNote}3`, '8n', time)
     } catch { /* ignore */ }
 
-    Tone.getDraw().schedule(() => { setDrillItemIdx(nextIdx) }, time)
+    Tone.getDraw().schedule(() => {
+      setRevealedItemIdx(toReveal)
+      setDrillItemIdx(nextIdx)
+    }, time)
   }, [])
 
   useEffect(() => {
@@ -173,23 +182,26 @@ export default function LearnChords() {
   )
   const clampedVoicingIdx = Math.min(voicingIdx, Math.max(0, refVoicings.length - 1))
 
-  const currentDrillItem = drillMode ? drillItems[drillItemIdx] : null
+  // Challenge = what to find (name shown, no dots); Revealed = previous answer (dots shown)
+  const challengeDrillItem = drillMode && drillStarted ? drillItems[drillItemIdx] : null
+  const revealedDrillItem = drillMode && drillStarted && revealedItemIdx >= 0
+    ? drillItems[revealedItemIdx] : null
 
   const { dots, fretFrom, fretTo } = useMemo((): {
     dots: FretDot[]
     fretFrom: number
     fretTo: number
   } => {
-    // Drill active (playing or paused): show current voicing
-    if (drillMode && drillStarted && currentDrillItem?.voicing) {
+    // Drill active: show dots for the revealed item (previous challenge)
+    if (drillMode && drillStarted && revealedDrillItem?.voicing) {
       return {
         dots: voicingToFretDots(
-          currentDrillItem.voicing,
+          revealedDrillItem.voicing,
           drillRoot,
-          currentDrillItem.qualitySymbol,
+          revealedDrillItem.qualitySymbol,
         ),
-        fretFrom: currentDrillItem.voicing.fretFrom,
-        fretTo: currentDrillItem.voicing.fretTo,
+        fretFrom: revealedDrillItem.voicing.fretFrom,
+        fretTo: revealedDrillItem.voicing.fretTo,
       }
     }
 
@@ -210,7 +222,7 @@ export default function LearnChords() {
       fretTo: refVoicings[clampedVoicingIdx].fretTo,
     }
   }, [
-    drillMode, drillStarted, currentDrillItem, drillRoot,
+    drillMode, drillStarted, revealedDrillItem, drillRoot,
     displayMode, root, quality, refVoicings, clampedVoicingIdx,
   ])
 
@@ -221,13 +233,17 @@ export default function LearnChords() {
     <div className="flex flex-col items-center p-6 gap-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between w-full max-w-3xl">
-        <h1 className="text-2xl font-bold text-zinc-200">Learn Chords</h1>
+      <h1 className="text-4xl font-bold font-display tracking-tight text-fg-primary">Learn Chords</h1>
+      <div className="flex items-center justify-between w-full max-w-[60rem]">
+
+        {/* Spacer */}
+        <div/>
+
         <div className="flex gap-2">
           {!drillMode && (
             <button
               onClick={() => setDrillMode(true)}
-              className="px-4 py-1.5 rounded text-sm font-medium bg-zinc-700 text-zinc-300 hover:bg-zinc-600 transition"
+              className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-surface-3 text-fg-secondary hover:bg-surface-3 transition"
             >
               Drill ▶
             </button>
@@ -236,13 +252,13 @@ export default function LearnChords() {
             <>
               <button
                 onClick={() => setDrillMode(false)}
-                className="px-4 py-1.5 rounded text-sm font-medium bg-zinc-700 text-zinc-300 hover:bg-zinc-600 transition"
+                className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-surface-3 text-fg-secondary hover:bg-surface-3 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={() => { setIsPlaying(true); setDrillStarted(true) }}
-                className="px-4 py-1.5 rounded text-sm font-medium bg-green-700 text-white hover:bg-green-600 transition"
+                className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-ui-success text-white hover:bg-ui-success-hover transition"
               >
                 Start ▶
               </button>
@@ -252,13 +268,13 @@ export default function LearnChords() {
             <>
               <button
                 onClick={() => { setDrillMode(false); setDrillStarted(false) }}
-                className="px-4 py-1.5 rounded text-sm font-medium bg-red-800 text-white hover:bg-red-700 transition"
+                className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-ui-destructive text-white hover:bg-ui-destructive-hover transition"
               >
                 End Drill
               </button>
               <button
                 onClick={() => setIsPlaying(true)}
-                className="px-4 py-1.5 rounded text-sm font-medium bg-green-700 text-white hover:bg-green-600 transition"
+                className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-ui-success text-white hover:bg-ui-success-hover transition"
               >
                 Resume ▶
               </button>
@@ -268,13 +284,13 @@ export default function LearnChords() {
             <>
               <button
                 onClick={() => { setIsPlaying(false); setDrillMode(false); setDrillStarted(false) }}
-                className="px-4 py-1.5 rounded text-sm font-medium bg-red-800 text-white hover:bg-red-700 transition"
+                className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-ui-destructive text-white hover:bg-ui-destructive-hover transition"
               >
                 End Drill
               </button>
               <button
                 onClick={() => setIsPlaying(false)}
-                className="px-4 py-1.5 rounded text-sm font-medium bg-zinc-700 text-zinc-300 hover:bg-zinc-600 transition"
+                className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-surface-3 text-fg-secondary hover:bg-surface-3 transition"
               >
                 Pause ⏸
               </button>
@@ -285,16 +301,16 @@ export default function LearnChords() {
 
       {/* ── Reference mode controls ── */}
       {!drillMode && (
-        <div className="flex flex-col gap-3 w-full max-w-3xl">
+        <div className="flex flex-col gap-3 w-full max-w-[60rem]">
           <div>
-            <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5">Root</div>
+            <div className="text-xs text-fg-muted uppercase tracking-widest mb-1.5">Root Note</div>
             <div className="flex flex-wrap gap-1.5">
               {ROOTS.map(r => (
                 <button
                   key={r}
                   onClick={() => { setRoot(r); setVoicingIdx(0) }}
                   className={`px-3 py-1 rounded text-sm font-mono transition ${
-                    root === r ? 'bg-sky-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                    root === r ? 'bg-ui-primary text-white' : 'bg-surface-2 text-fg-secondary hover:bg-surface-3'
                   }`}
                 >
                   {r}
@@ -303,14 +319,14 @@ export default function LearnChords() {
             </div>
           </div>
           <div>
-            <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5">Quality</div>
+            <div className="text-xs text-fg-muted uppercase tracking-widest mb-1.5">Quality</div>
             <div className="flex flex-wrap gap-1.5">
               {CHORD_QUALITIES.map(q => (
                 <button
                   key={q.symbol}
                   onClick={() => { setQuality(q.symbol); setVoicingIdx(0) }}
-                  className={`px-3 py-1 rounded text-sm transition ${
-                    quality === q.symbol ? 'bg-sky-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                  className={`px-3 py-1 rounded text-sm font-mono transition ${
+                    quality === q.symbol ? 'bg-ui-primary text-white' : 'bg-surface-2 text-fg-secondary hover:bg-surface-3'
                   }`}
                 >
                   {q.label}
@@ -323,9 +339,9 @@ export default function LearnChords() {
 
       {/* ── Drill config (before starting) ── */}
       {drillMode && !drillStarted && (
-        <div className="flex flex-col gap-5 w-full max-w-3xl">
+        <div className="flex flex-col gap-5 w-full max-w-[60rem]">
           <div>
-            <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5">Root Note</div>
+            <div className="text-xs text-fg-muted uppercase tracking-widest mb-1.5">Root Note</div>
             <div className="flex flex-wrap gap-1.5">
               {ROOTS.map(r => (
                 <button
@@ -333,8 +349,8 @@ export default function LearnChords() {
                   onClick={() => setDrillRoot(r)}
                   className={`px-3 py-1 rounded text-sm font-mono transition ${
                     drillRoot === r
-                      ? 'bg-amber-500 text-zinc-900'
-                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                      ? 'bg-ui-warning text-fg-inverse'
+                      : 'bg-surface-2 text-fg-secondary hover:bg-surface-3'
                   }`}
                 >
                   {r}
@@ -344,7 +360,7 @@ export default function LearnChords() {
           </div>
 
           <div>
-            <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5">Chord Types</div>
+            <div className="text-xs text-fg-muted uppercase tracking-widest mb-1.5">Chord Types</div>
             <div className="flex flex-wrap gap-2">
               {DRILL_QUALITIES.map(q => {
                 const active = drillEnabledSymbols.includes(q.symbol)
@@ -352,10 +368,10 @@ export default function LearnChords() {
                   <button
                     key={q.symbol}
                     onClick={() => toggleDrillQuality(q.symbol)}
-                    className={`px-3 py-1.5 rounded text-sm transition ${
+                    className={`px-3 py-1.5 rounded text-sm font-mono transition ${
                       active
-                        ? 'bg-amber-500 text-zinc-900'
-                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                        ? 'bg-ui-warning text-fg-inverse'
+                        : 'bg-surface-2 text-fg-muted hover:bg-surface-3'
                     }`}
                   >
                     {q.label}
@@ -363,7 +379,7 @@ export default function LearnChords() {
                 )
               })}
             </div>
-            <div className="text-zinc-600 text-xs mt-2">
+            <div className="text-fg-muted text-xs mt-2">
               {drillItems.length} positions in this drill
               {drillItems.length > 0 && (
                 <> ({drillEnabledSymbols.length} quality × {CAGED_SHAPES.length} shapes)</>
@@ -375,16 +391,16 @@ export default function LearnChords() {
       )}
 
       {/* ── Drill playing: current chord ── */}
-      {drillMode && drillStarted && currentDrillItem && (
+      {drillMode && drillStarted && challengeDrillItem && (
         <div className="flex flex-col items-center gap-1.5">
-          <div className="text-5xl font-bold font-mono text-center">
-            <span className="text-amber-400">{drillRoot}</span>{' '}
-            <span className="text-zinc-200">{currentDrillItem.qualityLabel}</span>
+          <div className="text-4xl font-bold font-display text-center">
+            <span className="text-ui-warning">{drillRoot}</span>{' '}
+            <span className="text-fg-primary">{challengeDrillItem.qualityLabel}</span>
           </div>
-          <div className="text-zinc-400 text-sm">
-            {currentDrillItem.shapeName} shape
+          <div className="text-fg-secondary text-sm">
+            {challengeDrillItem.shapeName} shape
           </div>
-          <div className="text-zinc-600 text-xs font-mono">
+          <div className="text-fg-muted text-xs font-mono">
             {drillItemIdx + 1} / {drillItems.length}
           </div>
         </div>
@@ -392,16 +408,16 @@ export default function LearnChords() {
 
       {/* ── Display / Label toggles (reference mode only) ── */}
       {!drillMode && (
-        <div className="flex items-center justify-between w-full max-w-3xl">
-          <div className="flex rounded overflow-hidden border border-zinc-700">
+        <div className="flex items-center justify-between w-full max-w-[60rem]">
+          <div className="flex rounded overflow-hidden border border-border-strong">
             {(['neck', 'voicings'] as const).map(mode => (
               <button
                 key={mode}
                 onClick={() => setDisplayMode(mode)}
-                className={`px-4 py-1.5 text-sm transition ${
+                className={`px-4 py-1.5 text-sm font-display font-semibold transition ${
                   displayMode === mode
-                    ? 'bg-zinc-700 text-zinc-100'
-                    : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
+                    ? 'bg-surface-3 text-fg-primary'
+                    : 'bg-surface-1 text-fg-muted hover:bg-surface-2'
                 }`}
               >
                 {mode === 'neck' ? 'Full Neck' : 'Voicings'}
@@ -409,15 +425,15 @@ export default function LearnChords() {
             ))}
           </div>
 
-          <div className="flex rounded overflow-hidden border border-zinc-700">
+          <div className="flex rounded overflow-hidden border border-border-strong">
             {(['intervals', 'notes'] as const).map(mode => (
               <button
                 key={mode}
                 onClick={() => setLabelMode(mode)}
-                className={`px-4 py-1.5 text-sm transition ${
+                className={`px-4 py-1.5 text-sm font-display font-semibold transition ${
                   labelMode === mode
-                    ? 'bg-zinc-700 text-zinc-100'
-                    : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
+                    ? 'bg-surface-3 text-fg-primary'
+                    : 'bg-surface-1 text-fg-muted hover:bg-surface-2'
                 }`}
               >
                 {mode === 'intervals' ? 'Intervals' : 'Notes'}
@@ -429,7 +445,7 @@ export default function LearnChords() {
 
       {/* ── Fretboard (hidden during drill config) ── */}
       {(!drillMode || drillStarted) && (
-        <div className="w-full max-w-3xl overflow-x-auto">
+        <div className="w-full max-w-[60rem] overflow-x-auto">
           <FretboardView dots={dots} fretFrom={fretFrom} fretTo={fretTo} dotText={dotText} colorBy="interval" />
         </div>
       )}
@@ -440,11 +456,11 @@ export default function LearnChords() {
           <button
             onClick={() => setVoicingIdx(i => Math.max(0, i - 1))}
             disabled={clampedVoicingIdx === 0}
-            className="px-3 py-1 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="px-3 py-1 rounded bg-surface-2 text-fg-secondary hover:bg-surface-3 disabled:opacity-30 disabled:cursor-not-allowed font-display font-semibold transition"
           >
             ←
           </button>
-          <span className="text-zinc-400 text-sm font-mono">
+          <span className="text-fg-secondary text-sm font-mono">
             {refVoicings.length > 0
               ? `${clampedVoicingIdx + 1} / ${refVoicings.length}`
               : 'No voicings'}
@@ -452,7 +468,7 @@ export default function LearnChords() {
           <button
             onClick={() => setVoicingIdx(i => Math.min(refVoicings.length - 1, i + 1))}
             disabled={clampedVoicingIdx >= refVoicings.length - 1}
-            className="px-3 py-1 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="px-3 py-1 rounded bg-surface-2 text-fg-secondary hover:bg-surface-3 disabled:opacity-30 disabled:cursor-not-allowed font-display font-semibold transition"
           >
             →
           </button>
