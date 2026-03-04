@@ -281,6 +281,12 @@ export default function LearnChords() {
           {drillMode && drillStarted && !isPlaying && (
             <>
               <button
+                onClick={() => setDrillStarted(false)}
+                className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-surface-2 text-fg-secondary hover:bg-surface-3 transition"
+              >
+                Settings
+              </button>
+              <button
                 onClick={() => { setDrillMode(false); setDrillStarted(false) }}
                 className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-ui-destructive text-white hover:bg-ui-destructive-hover transition"
               >
@@ -296,6 +302,12 @@ export default function LearnChords() {
           )}
           {drillMode && drillStarted && isPlaying && (
             <>
+              <button
+                onClick={() => { setIsPlaying(false); setDrillStarted(false) }}
+                className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-surface-2 text-fg-secondary hover:bg-surface-3 transition"
+              >
+                Settings
+              </button>
               <button
                 onClick={() => { setIsPlaying(false); setDrillMode(false); setDrillStarted(false) }}
                 className="px-4 py-1.5 rounded text-sm font-display font-semibold bg-ui-destructive text-white hover:bg-ui-destructive-hover transition"

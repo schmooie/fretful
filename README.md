@@ -48,6 +48,7 @@ Reference and drill tool for CAGED system chord voicings.
 - The metronome reveals one chord per measure: the chord name and CAGED shape are shown on beat 1, the previous chord's voicing dots appear simultaneously
 - Cycles through all shapes for every selected quality
 - Default: Major only; any combination of Major / Minor / Dom 7 / Maj 7 / Min 7
+- **Settings button** — returns to drill configuration mid-drill without losing settings
 
 ---
 
